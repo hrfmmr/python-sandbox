@@ -1,1 +1,5 @@
 # python-sandbox
+
+```
+$ make setup
+```
