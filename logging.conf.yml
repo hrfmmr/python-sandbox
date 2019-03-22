@@ -1,0 +1,24 @@
+---
+version: 1
+disable_existing_loggers: False
+formatters:
+  simple:
+    format: "[%(levelname)s](%(process)s-%(threadName)s) @%(asctime)s - %(name)s.%(filename)s#%(funcName)s():L%(lineno)s - %(message)s"
+
+handlers:
+  debug_stream_handler:
+    class: logging.StreamHandler
+    level: DEBUG
+    formatter: simple
+    stream: ext://sys.stdout
+
+  debug_file_handler:
+    class: logging.FileHandler
+    level: DEBUG
+    formatter: simple
+    filename: debug.log
+    encoding: utf8
+
+root:
+  level: DEBUG
+  handlers: [debug_stream_handler, debug_file_handler]

@@ -1,4 +1,8 @@
+import logging
+
 import numpy as np
+
+logger = logging.getLogger(__name__)
 
 
 class ShortRingBuffer:
@@ -67,9 +71,13 @@ class ShortRingBuffer:
             to_cap_buf = self.buffer[self.read_pos:self.read_pos + to_cap_len]
             # 先頭から残りを読み込む
             rest_len = self.frame_size - to_cap_len
-            rest_buf = self.buffer[:rest_len]
-            ret = np.append(to_cap_buf, rest_buf)
-            self.read_pos = rest_len
+            if rest_len:
+                rest_buf = self.buffer[:rest_len]
+                ret = np.append(to_cap_buf, rest_buf)
+                self.read_pos = rest_len
+            else:
+                ret = to_cap_buf
+                self.read_pos = self.capacity
             return ret.tobytes()
 
     def read_rest(self) -> bytes:

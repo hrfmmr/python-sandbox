@@ -107,7 +107,7 @@ class TestShortRingBuffer:
         assert rest_buf == np.array([1, 0], dtype=ShortRingBuffer.DATA_TYPE).tobytes()
 
     def test_is_filled(self):
-        capacity = 5
+        capacity = 6
         frame_size = 2
         ring_buf = ShortRingBuffer(capacity, frame_size)
 
@@ -116,13 +116,12 @@ class TestShortRingBuffer:
             ring_buf.write(pcm.tobytes())
 
         assert not ring_buf.is_filled()
-        _write([1])
-        assert not ring_buf.is_filled()
-        _write([2])
-        assert ring_buf.is_filled()
-        _write([3, 4, 5])
+        _write([1, 2, 3, 4, 5, 6])
+        ring_buf.read()
         ring_buf.read()
         ring_buf.read()
         assert not ring_buf.is_filled()
-        _write([6])
+        _write([7])
+        assert not ring_buf.is_filled()
+        _write([8])
         assert ring_buf.is_filled()
