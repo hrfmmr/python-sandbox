@@ -1,7 +1,9 @@
 import asyncio
 import logging
 from queue import Queue
-from threading import Thread
+from threading import Thread, Timer
+import time
+import typing as t
 
 import numpy as np
 import pyaudio
@@ -19,6 +21,8 @@ RATE = 16_000
 FRAME_SEC = 0.04
 # 1フレームのbufferサイズ
 CHUNK = int(RATE * FRAME_SEC)
+# 録音時間
+RECORD_DURATION_SEC = 3
 
 setup_logger('logging.conf.yml')
 logger = logging.getLogger(__name__)
@@ -31,9 +35,11 @@ class Recorder:
         self._audio = pyaudio.PyAudio()
         self._stream = None
         self._ring_buf = ShortRingBuffer(capacity=CHUNK * 20, frame_size=CHUNK*4)
+        self._flush_dispatcher: t.Optional[Timer] = None
 
     def start_rec(self):
         logger.debug('start_rec')
+        self.start = time.time()
         self._stream = self._audio.open(
             format=FORMAT,
             channels=CHANNELS,
@@ -68,7 +74,12 @@ class Recorder:
             time_info,
             status
     ):
-        logger.debug(f'in_data len:{len(in_data)} type:{type(in_data)}')
+        elapsed = int(time.time() - self.start)
+        logger.debug(f'elapsed:{elapsed}sec')
+        if elapsed >= RECORD_DURATION_SEC:
+            self.stop_rec()
+            return None, pyaudio.paComplete
+        logger.debug(f'in_data:{in_data[:10]} len:{len(in_data)}')
         self.buf_input_queue.put(in_data)
         return None, pyaudio.paContinue
 
@@ -77,10 +88,13 @@ class Recorder:
             buf = self.buf_input_queue.get()
             logger.debug(f'👇 write buf:{buf[:10]}({len(buf)})')
             self._ring_buf.write(buf)
+            if self._flush_dispatcher:
+                self._flush_dispatcher.cancel()
             while self._ring_buf.is_filled():
                 buf = self._ring_buf.read()
                 logger.debug(f'👆 read buf:{buf[:10]}({len(buf)})')
                 self.buf_output_queue.put(buf)
+            self.register_flush()
 
     def handle_read_buf(self):
         async def coro():
@@ -92,6 +106,16 @@ class Recorder:
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         loop.run_until_complete(coro())
+
+    def register_flush(self):
+        self._flush_dispatcher = Timer(1.0, self.flush)
+        self._flush_dispatcher.setName('FlushBufferThread')
+        self._flush_dispatcher.start()
+
+    def flush(self):
+        rest_buf = self._ring_buf.read_rest()
+        logger.debug(f'✔ rest_buf:{rest_buf} len:{len(rest_buf)}')
+        self.buf_output_queue.put(rest_buf)
 
 
 if __name__ == '__main__':
